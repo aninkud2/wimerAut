@@ -3,6 +3,8 @@ const bcrypt=require("bcryptjs")
 const jwt=require("jsonwebtoken")
 const userModel = require("../model/usermodel")
 const mailSender=require("./email")
+const dotenv=require("dotenv")
+dotenv.config()
 
 exports.isAuth=async(req,res,next)=>{
  // const user=await userModel.findById(req.params.id)
@@ -31,13 +33,15 @@ password:hashedPassword
 const token=jwt.sign(
 {
 id:createduser._id,
-password:createduser.password
-},process.env.secretkey,{expiresIn:"1d"}
+email:createduser.email
+},process.env.secretkey,{expiresIn:300}
 )
+
+
 createduser.token=token
 const subject="KINDLY VERIFY"
-const link=`${req.protocol}://${req.get("host")}/userverify/${createduser._id}`
-const message=` Welcome onboard, kindly  use this link ${ link} to  verify your acct`
+const link=`${req.protocol}://${req.get("host")}/userverify/${createduser._id}/${token}`
+const message=` Welcome onboard, kindly  use this link ${ link} to  verify your acct kindly note that this link will expire after five(5) minutes`
 mailSender(
 {
 email:createduser.email,
@@ -58,26 +62,43 @@ catch (error) {
 
 //user verify
 exports. userVerify=async(req,res)=>{
+
   try {
+    const registeredUser=await user.findById(req.params.id)
+    const registeredToken=registeredUser.token
+   const userVerified= await jwt.verify(registeredToken,process.env.secretkey,(err,data)=>{
+      if(err){res.json("This link has expired")}
+      else{
+        return data
+      }
+    })
+
+
   const verified=await user.findByIdAndUpdate(req.params.id,{isVerified:true})
-  if(!verified)res.json("Unable to verify this account")
+  if(!verified){
+    res.json("Unable to verify this account")
+  }
   else{
     res.json(`user ${verified.email} has been verifed`)
   }
-} catch (error) {
-  res.json(error.message)
+}
+  
+ catch (error) {
+ error.message
 }
 
-}
 
+}
 
 //to log in
 exports.userLogin=async(req,res)=>{
   try {
+
+
    // const {username,password}=req.body
    const userpassword=req.body.password
 const checkUsername=await user.findOne({$or:[{username:req.body.username},{email:req.body.email}]} )
-
+const checkIfVerified=checkUsername.isVerified
 if(!checkUsername )
 return res.json("Username not found or in-correct")
 
@@ -87,6 +108,32 @@ const checkPassword=bcrypt.compareSync(userpassword,checkUsername.password)
 if(!checkPassword)
    return res.json("Invalid password")
 
+
+else if(checkIfVerified==false){
+ 
+  
+  const token=jwt.sign(
+    {
+    id:checkUsername._id,
+    email:checkUsername.email
+    },process.env.secretkey,{expiresIn:300}
+    )
+
+  const subject="RE VERIFY YOUR ACCOUNT"
+  const link=`${req.protocol}://${req.get("host")}/userverify/${checkUsername._id}/${token}`
+  const message=`  kindly  use this link ${ link} to  reverify your acct ,kindly note that this link will expire after five(5) minutes`
+  mailSender(
+  {
+  email:checkUsername.email,
+   subject,
+   message 
+  }
+  )
+
+return res.json("you havent verified your acct,check your email to reverify your account")
+}
+
+  
 
 const usertoken=jwt.sign(
     {

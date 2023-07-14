@@ -5,7 +5,7 @@ const{isAdminauthorized,isSuperAdminauthorized}=require("../controller/authoriza
 const router=require("express").Router()
 router.route("/").get(homepage) 
 router.route("/signup").post(newUser)
-router.route("/userverify/:id").put(userVerify)
+router.route("/userverify/:id/:token").put(userVerify)
 router.route("/login").post(userLogin) 
 router.route("/getall/:id").get(isSuperAdminauthorized,getAll) 
 router.route("/getallW/:id").get(getAll) 
